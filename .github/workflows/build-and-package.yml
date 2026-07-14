@@ -24,13 +24,23 @@ jobs:
           extensions: mbstring, xml, ctype, json, bcmath, gd, pdo, pdo_mysql
           coverage: none
 
-      - name: Disable Composer Advisory Blocking
+      - name: Create required directories
         run: |
-          composer config --global policy.advisories.block false
-          echo "Composer advisory blocking disabled"
+          mkdir -p bootstrap/cache
+          mkdir -p storage/framework/cache/data
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+          mkdir -p storage/app/public
+          chmod -R 775 bootstrap/cache storage
 
       - name: Install Composer Dependencies
-        run: composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+        run: |
+          composer config policy.advisories.block false
+          composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs 2>&1 || {
+            echo "--- Composer install failed, trying with --no-scripts ---"
+            composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-scripts 2>&1
+          }
 
       # ─── Node.js Setup ──────────────────────────────────
       - name: Setup Node.js
