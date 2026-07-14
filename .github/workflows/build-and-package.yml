@@ -3,11 +3,14 @@ name: Build & Package for Deployment
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:  # Allow manual trigger from browser
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      COMPOSER_ALLOW_SUPERUSER: 1
 
     steps:
       - name: Checkout code
@@ -21,29 +24,19 @@ jobs:
           extensions: mbstring, xml, ctype, json, bcmath, gd, pdo, pdo_mysql
           coverage: none
 
-      - name: Get Composer Cache Directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache Composer Dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Disable Composer Security Advisory Blocking
-        run: composer config --no-interaction policy.advisories.block false
+      - name: Disable Composer Advisory Blocking
+        run: |
+          composer config --global policy.advisories.block false
+          echo "Composer advisory blocking disabled"
 
       - name: Install Composer Dependencies
-        run: composer install --no-dev --optimize-autoloader --no-interaction
+        run: composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
       # ─── Node.js Setup ──────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
       - name: Install NPM Dependencies
         run: npm install
@@ -52,36 +45,59 @@ jobs:
         run: npm run build
 
       # ─── Package Everything ─────────────────────────────
-      - name: Create deployment directory structure
+      - name: Create deployment ZIP
         run: |
+          # Create clean deploy directory
+          rm -rf deploy
           mkdir -p deploy
-          # Copy everything except .git and deploy dir
-          rsync -av --exclude='.git' --exclude='node_modules' --exclude='deploy' --exclude='tests' --exclude='.github' --exclude='vendor' . deploy/
-          # Copy vendor into deploy
-          cp -r vendor deploy/vendor
-          # Copy built assets into deploy
-          cp -r public/build deploy/public/build
+          
+          # Copy all project files (exclude dev/CI stuff)
+          rsync -av \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='deploy' \
+            --exclude='tests' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='composer.json' \
+            --exclude='composer.lock' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            --exclude='vite.config.js' \
+            --exclude='postcss.config.js' \
+            --exclude='tailwind.config.js' \
+            --exclude='putrakop_live_chat.zip' \
+            --exclude='*.md' \
+            . deploy/
+          
           # Ensure storage directories exist
           mkdir -p deploy/storage/app/public
           mkdir -p deploy/storage/framework/cache/data
           mkdir -p deploy/storage/framework/sessions
           mkdir -p deploy/storage/framework/views
           mkdir -p deploy/storage/logs
-          # Add .gitkeep files to storage
+          mkdir -p deploy/bootstrap/cache
+          
+          # Add .gitkeep files
           touch deploy/storage/app/.gitkeep
           touch deploy/storage/app/public/.gitkeep
           touch deploy/storage/framework/cache/data/.gitkeep
           touch deploy/storage/framework/sessions/.gitkeep
           touch deploy/storage/framework/views/.gitkeep
           touch deploy/storage/logs/.gitkeep
+          touch deploy/bootstrap/cache/.gitkeep
+          
           # Make storage writable
           chmod -R 775 deploy/storage
-
-      - name: Create deployment ZIP
-        run: |
+          chmod -R 775 deploy/bootstrap/cache
+          
+          # Create ZIP
           cd deploy
           zip -r ../putrakop-livechat-deploy.zip .
           cd ..
+          
+          echo "ZIP created successfully"
+          ls -lh putrakop-livechat-deploy.zip
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
