@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import {
   CheckIcon,
-  CheckCheckIcon,
+  CheckBadgeIcon,
   DocumentIcon,
   PhotoIcon,
   ExclamationCircleIcon,
@@ -220,11 +220,11 @@ const getInitials = (name) => {
             v-if="readStatusIcon === 'sent'"
             class="w-3.5 h-3.5 text-gray-400"
           />
-          <CheckCheckIcon
+          <CheckBadgeIcon
             v-else-if="readStatusIcon === 'delivered'"
             class="w-3.5 h-3.5 text-gray-400"
           />
-          <CheckCheckIcon
+          <CheckBadgeIcon
             v-else-if="readStatusIcon === 'read'"
             class="w-3.5 h-3.5 text-primary-500"
           />
