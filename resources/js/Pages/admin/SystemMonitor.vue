@@ -36,7 +36,7 @@ import {
   ExclamationTriangleIcon as ExclamationTriangleSolid,
   XCircleIcon as XCircleSolid
 } from '@heroicons/vue/24/solid'
-import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AdminLayout from './Layout.vue'
 
 const props = defineProps({
   systemHealth: {
