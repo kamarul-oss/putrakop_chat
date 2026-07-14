@@ -1,0 +1,89 @@
+name: Build & Package for Deployment
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # Allow manual trigger from browser
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─── PHP Setup ──────────────────────────────────────
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, json, bcmath, gd, pdo, pdo_mysql
+          coverage: none
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      # ─── Node.js Setup ──────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Frontend Assets
+        run: npm run build
+
+      # ─── Package Everything ─────────────────────────────
+      - name: Create deployment directory structure
+        run: |
+          mkdir -p deploy
+          # Copy everything except .git and deploy dir
+          rsync -av --exclude='.git' --exclude='node_modules' --exclude='deploy' --exclude='tests' --exclude='.github' --exclude='vendor' . deploy/
+          # Copy vendor into deploy
+          cp -r vendor deploy/vendor
+          # Copy built assets into deploy
+          cp -r public/build deploy/public/build
+          # Ensure storage directories exist
+          mkdir -p deploy/storage/app/public
+          mkdir -p deploy/storage/framework/cache/data
+          mkdir -p deploy/storage/framework/sessions
+          mkdir -p deploy/storage/framework/views
+          mkdir -p deploy/storage/logs
+          # Add .gitkeep files to storage
+          touch deploy/storage/app/.gitkeep
+          touch deploy/storage/app/public/.gitkeep
+          touch deploy/storage/framework/cache/data/.gitkeep
+          touch deploy/storage/framework/sessions/.gitkeep
+          touch deploy/storage/framework/views/.gitkeep
+          touch deploy/storage/logs/.gitkeep
+          # Make storage writable
+          chmod -R 775 deploy/storage
+
+      - name: Create deployment ZIP
+        run: |
+          cd deploy
+          zip -r ../putrakop-livechat-deploy.zip .
+          cd ..
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: putrakop-livechat-deploy
+          path: putrakop-livechat-deploy.zip
+          retention-days: 7
+          if-no-files-found: error

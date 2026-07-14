@@ -1,0 +1,34 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Uncomment if you need to handle 404 through Laravel
+# ErrorDocument 404 /index.php
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Deny access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Allow access to setup.php during installation only
+# DELETE setup.php after installation for security!
+# <Files "setup.php">
+#     Require all granted
+# </Files>
